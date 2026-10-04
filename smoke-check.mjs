@@ -1,0 +1,45 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import {gzipSync} from 'node:zlib';
+import {webcrypto} from 'node:crypto';
+const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+const workerCode=html.match(/<script id="worker-source" type="text\/plain">([\s\S]*?)<\/script>/)[1];
+const uiCode=html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+new vm.Script(workerCode);new vm.Script(uiCode);
+async function run(files,overrides={},extra={}){
+ const messages=[];const context=vm.createContext({Blob,TextDecoder,TextEncoder,Uint8Array,DataView,DecompressionStream,URL,crypto:webcrypto,self:{},postMessage:m=>messages.push(m)});
+ new vm.Script(workerCode).runInContext(context);
+ await context.self.onmessage({data:{files,options:{year:2026,tz:0,encoding:'utf-8',rules:[],...overrides},...extra}});
+ const errors=messages.filter(m=>m.type==='error');assert.equal(errors.length,0,JSON.stringify(errors));
+ return {events:messages.filter(m=>m.type==='events').flatMap(m=>m.events),sources:messages.filter(m=>m.type==='source').map(m=>m.source),messages};
+}
+const f=(name,text)=>{const b=new Blob([text]);b.name=name;return b};
+let r=await run([f('auth.log','Oct  4 12:34:56 host sshd[1]: Accepted password for root from 192.0.2.1 port 2222 ssh2\n2026-10-04T12:34:57+09:00 host sshd: session closed\nno time <script>alert(1)</script>\n')]);
+assert.equal(r.events.length,3);assert.equal(r.events[0].ts,Date.UTC(2026,9,4,12,34,56));assert.equal(r.events[1].ts,Date.UTC(2026,9,4,3,34,57));assert.equal(r.events[2].ts,null);assert.equal(r.events[0].ips[0],'192.0.2.1');assert.equal(r.events[0].users[0],'root');
+r=await run([f('audit.log','type=SYSCALL msg=audit(1791028803.123:77): uid=0\ntype=EXECVE msg=audit(1791028803.123:77): a0=6d7973716c64756d70 a1="--all-databases"\ntype=PATH msg=audit(1791028803.123:77): name="/tmp/a.sql"\n')]);
+assert.equal(r.events.length,1);assert(r.events[0].tags.includes('dump'));assert(r.events[0].decoded.includes('mysqldump'));assert.equal(r.events[0].endLine,3);
+r=await run([f('.bash_history','#1791028803\nmysqldump --all-databases > /tmp/a.sql\n#1791028961\ngzip /tmp/a.sql\n')]);assert.equal(r.events.length,2);assert.equal(r.events[0].ts,1791028803000);
+const journal='{"__REALTIME_TIMESTAMP":"1791028803123000","MESSAGE":"mysqldump --all-databases","_UID":"0"}';
+r=await run([f('journal.jsonl',journal)]);assert.equal(r.events[0].ts,1791028803123);assert.equal(r.events[0].raw,journal);assert(r.events[0].tags.includes('dump'));
+r=await run([f('last.txt','root pts/0 192.0.2.1 Sun Oct  4 12:34:56 2026 - Sun Oct  4 12:40:56 2026 (00:06)')]);assert.equal(r.events[0].ts,Date.UTC(2026,9,4,12,34,56));
+r=await run([f('access.log','192.0.2.1 - - [04/Oct/2026:12:34:56 +0900] "GET / HTTP/1.1" 200 234')]);assert.equal(r.events[0].ts,Date.UTC(2026,9,4,3,34,56));
+const rule={pattern:'*custom*',mode:'custom',format:'DD/MM/YYYY HH:mm:ss',regex:'',tz:'540'};
+r=await run([f('custom.log','04/10/2026 12:34:56 mysqldump\nnot a time')],{rules:[rule]});assert.equal(r.events[0].ts,Date.UTC(2026,9,4,3,34,56));assert.equal(r.events[0].sourceTz,540);assert.equal(r.events[1].ts,null);
+r=await run([f('custom.log','eventTime=2026.10.04 12:34:56; mysqldump')],{rules:[{...rule,format:'YYYY.MM.DD HH:mm:ss',regex:'eventTime=([^;]+)'}]});assert.equal(r.events[0].ts,Date.UTC(2026,9,4,3,34,56));
+r=await run([f('custom.log','epoch=1791028803123000 command=mysqldump')],{rules:[{...rule,format:'UNIX_US'}]});assert.equal(r.events[0].ts,1791028803123);
+r=await run([f('custom.log','2026-10-04T12:34:56.123Z command=mysqldump')],{rules:[{...rule,format:'YYYY-MM-DDTHH:mm:ss.SSSZZ'}]});assert.equal(r.events[0].ts,Date.UTC(2026,9,4,12,34,56,123));
+const gz=f('auth.log.gz',gzipSync(Buffer.from('Oct  4 12:34:56 host sshd: Accepted password for root from 192.0.2.1\n')));
+r=await run([gz],{hash:true});assert.equal(r.events.length,1);assert.equal(r.sources[0].hash.length,64);
+r=await run([f('bad.wtmp',new Uint8Array(4096))]);assert.equal(r.events.length,0);assert.equal(r.sources[0].status,'건너뜀');
+r=await run([f('auth.log','2026-02-30 12:34:56 impossible')]);assert.equal(r.events[0].ts,null);
+r=await run([],{},{mode:'preview',rule,lines:['04/10/2026 12:34:56']});assert.equal(r.messages[0].results[0].ts,Date.UTC(2026,9,4,3,34,56));
+r=await run([f('auth.log','Oct  4 12:34:56 event')],{rules:[{...rule,pattern:'*auth*',mode:'auto',year:'2025'}]});assert.equal(r.events[0].ts,Date.UTC(2025,9,4,3,34,56));
+r=await run([f('audit.log','type=SYSCALL msg=audit(1791028803.123:77): uid=0\ntype=SYSCALL msg=audit(1791029903.123:77): uid=0')]);assert.equal(r.events.length,2);
+for(const name of ['sample.zip','sample.tar.gz']){r=await run([f(name,fs.readFileSync(new URL('./check-fixtures/'+name,import.meta.url)))],{rules:[rule]});assert.equal(r.events.length,2,JSON.stringify(r.sources));assert(r.events[1].tags.includes('dump'));}
+assert(html.includes("connect-src 'none'"));assert(!/https?:\/\//.test(uiCode));
+const csvSource=uiCode.match(/function csvCell\(value\)([^\n]+)/)[0];
+const exportSource=uiCode.match(/function exportCsv\(\)([^\n]+)/)[0];let exported;
+const exportContext=vm.createContext({filtered:[{...r.events[0],raw:'=SUM(1,2)\n"quoted"',sourceTz:0,year:2026}],labels:{access:'접속·종료',dump:'덤프 명령',file:'파일명'},time:()=> '2026-10-04 00:00:00',tzLabel:()=> 'UTC+00:00',offset:()=>0,noteOf:()=>({star:true,text:'검토 메모'}),download:(name,content)=>exported={name,content}});
+new vm.Script(csvSource+'\n'+exportSource+'\nexportCsv();').runInContext(exportContext);assert(exported.content.startsWith('\uFEFF'));assert(exported.content.includes("'=SUM(1,2)"));assert(exported.content.includes('""quoted""'));assert(exported.content.includes('검토 메모'));
+console.log('PASS: syntax, dates/timezones, SSH entities, audit grouping/hex, history, journal raw preservation, last, web logs, custom rules/epoch/regex, gzip/hash, binary rejection, invalid dates, preview, offline policy');

@@ -1,0 +1,32 @@
+# Local incident evidence and secrets
+evidence/
+logs/
+exports/
+.env
+.env.*
+*.log
+*.sql
+*.dump
+*.bak
+*.gz
+*.tar
+*.zip
+*.journal
+*.wtmp
+*.btmp
+*.pcap
+*.pcapng
+*.key
+*.pem
+사고로그_메모*.json
+
+# Explicit synthetic test archives
+!check-fixtures/sample.zip
+!check-fixtures/sample.tar.gz
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+.vscode/
