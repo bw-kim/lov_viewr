@@ -9,7 +9,7 @@ end = "<!-- triage-enhancement:end -->"
 if start in html:
     before, rest = html.split(start, 1)
     _, after = rest.split(end, 1)
-    html = before + after
+    html = before.rstrip("\r\n") + "\n" + after.lstrip("\r\n")
 css = (root / "triage.css").read_text(encoding="utf-8")
 js = (root / "triage.js").read_text(encoding="utf-8")
 addition = f"{start}\n<style>\n{css}</style>\n<script>\n{js}</script>\n{end}\n"
