@@ -18,6 +18,9 @@ exports/
 *.pcapng
 *.key
 *.pem
+*.seed
+*.dec
+*.part
 사고로그_메모*.json
 
 # Explicit synthetic test archives

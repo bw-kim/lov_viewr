@@ -8,6 +8,29 @@
 
 파일은 브라우저 안에서 읽으며 원본을 수정하지 않습니다. 페이지는 외부 연결을 차단하는 Content Security Policy를 포함합니다.
 
+## SEED-128 ECB 암복호화 도구 (Python)
+
+긴 문자열이나 큰 파일을 처리하는 별도 로컬 프로그램 `seed_ecb_tool.py`를 포함합니다. **SEED 키는 정확히 16바이트**이며, 16바이트는 한 번에 처리하는 블록 크기이기도 합니다. 입력 전체가 16바이트로 제한되는 것은 아닙니다. 텍스트는 길이에 제한을 두지 않고, 파일은 1 MiB씩 읽어 메모리에 전부 올리지 않습니다.
+
+```sh
+python -m pip install -r requirements-seed.txt
+python seed_ecb_tool.py
+```
+
+Windows에서는 설치 후 `시작_SEED_ECB.bat`를 더블클릭해도 됩니다. 화면에서 암호화·복호화, 키의 UTF-8/Hex/Base64 형식, 입력·출력 형식, 패딩 방식을 고를 수 있습니다. 파일을 선택하면 결과 저장 위치를 지정할 수 있고 진행 상태가 표시됩니다. 파일 결과는 Base64 문서가 아니라 암호문 또는 복호문 **원본 바이트**로 저장됩니다. 텍스트 결과가 길면 화면에는 앞의 20만 자만 보이지만 **복사와 저장은 전체 결과**를 사용합니다.
+
+기본 패딩은 PKCS#7입니다. 기존 시스템과 맞추려면 상대 시스템의 패딩 방식도 확인하세요. **패딩 없음**은 평문이 16바이트의 배수일 때만 쓸 수 있습니다. **0x00 채우기**는 복호화할 때 원문 끝의 실제 0x00 바이트와 패딩을 구분할 수 없습니다. 암호문은 Base64 또는 Hex로 표시하며, 결과가 UTF-8 텍스트가 아니면 Hex/Base64 표시를 선택하세요.
+
+큰 파일은 명령줄에서도 처리할 수 있습니다. 키는 명령 인자에 적지 않고 실행 후 입력합니다.
+
+```sh
+python seed_ecb_tool.py --cli encrypt input.bin output.seed
+python seed_ecb_tool.py --cli decrypt output.seed recovered.bin
+python seed_ecb_tool.py --cli decrypt output.seed recovered.bin --key-format hex --padding none
+```
+
+기존 출력 파일을 바꾸려면 `--overwrite`를 추가합니다. 파일 처리가 실패하면 임시 결과를 지우고 기존 출력 파일은 유지합니다. ECB는 같은 평문 블록이 같은 암호문 블록으로 나타나므로 기존 형식과의 호환이 필요한 경우에 사용하세요. 이 도구는 입력과 키를 외부 서버로 전송하지 않습니다.
+
 ## 기능
 
 - 여러 파일 또는 폴더를 불러와 시간순으로 통합합니다.
