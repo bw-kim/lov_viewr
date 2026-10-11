@@ -26,6 +26,7 @@ exports/
 # Explicit synthetic test archives
 !check-fixtures/sample.zip
 !check-fixtures/sample.tar.gz
+!downloads/SEED_ECB_Python_portable.zip
 
 # Editor and OS files
 .DS_Store

@@ -1,0 +1,37 @@
+SEED-ECB Python 포터블 도구
+
+Python 3.10 이상만 있으면 실행할 수 있습니다. pip 설치는 필요하지 않습니다.
+SEED_ECB_portable.py 파일 하나에 암호화 구현과 화면을 모두 포함했습니다.
+
+실행: python SEED_ECB_portable.py
+Windows: 시작_SEED_ECB.bat 더블클릭
+화면은 Python 기본 tkinter를 사용합니다. tkinter가 없는 환경에서는 명령줄을 사용하세요.
+
+키: 정확히 16바이트 (영문/숫자 16자 또는 Hex 32자리)
+문자열의 길이는 16자로 제한되지 않습니다. 한글은 UTF-8 바이트 수로 계산합니다.
+기본 패딩: PKCS#7. 다른 시스템의 암호문을 풀려면 키, 패딩, 표시 형식을 맞추세요.
+ECB는 IV를 사용하지 않습니다.
+
+텍스트: 암호화/복호화 선택 → 키 입력 → 본문 입력 → 실행
+입출력의 문자열/Hex/Base64 형식을 선택할 수 있습니다.
+긴 결과는 앞의 20만 자만 표시하며 복사와 저장은 전체 결과를 사용합니다.
+
+파일: 입력 파일 선택 → 실행 → 결과 저장 위치 지정
+64 KiB씩 처리하므로 큰 파일을 메모리에 전부 올리지 않습니다.
+파일 결과는 Base64 문서가 아니라 암호문/복호문의 원본 바이트로 저장됩니다.
+파일 처리에 실패하면 임시 결과를 지우고 기존 출력 파일을 유지합니다.
+
+명령줄:
+python SEED_ECB_portable.py --cli encrypt input.bin output.seed
+python SEED_ECB_portable.py --cli decrypt output.seed recovered.bin
+python SEED_ECB_portable.py --cli decrypt output.seed recovered.bin --key-format hex --padding none
+키는 실행 후 따로 입력합니다. 기존 결과를 바꾸려면 --overwrite를 추가하세요.
+
+패딩 없음: 입력이 16바이트의 배수여야 합니다.
+0x00 채우기: 복호화 시 끝의 0x00을 모두 제거하므로 실제 데이터 끝의 0x00과 구분할 수 없습니다.
+ECB는 같은 평문 블록이 같은 암호문 블록으로 보입니다. 기존 시스템과의 호환에 사용하세요.
+순수 Python 버전은 외부 라이브러리 버전보다 큰 파일 처리가 느릴 수 있습니다.
+입력과 키를 외부 서버에 보내지 않습니다.
+
+알고리즘 기준: RFC 4269 (KISA SEED-128)
+https://www.rfc-editor.org/rfc/rfc4269.html

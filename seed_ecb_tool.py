@@ -1,4 +1,4 @@
-"""Local SEED-128 ECB tool. Run without arguments for the desktop window.
+"""Standard-library-only SEED-128 ECB tool. Run without arguments for the window.
 
 For a large file on a terminal:
     python seed_ecb_tool.py --cli encrypt input.bin output.seed
@@ -25,12 +25,7 @@ try:
 except ImportError:
     tk = None
 
-try:
-    from seed_ecb_core import decode_value, encode_value, parse_key, transform_stream
-except ImportError as exc:
-    if exc.name and exc.name.startswith("cryptography"):
-        raise SystemExit("cryptography 패키지가 필요합니다: python -m pip install -r requirements-seed.txt") from exc
-    raise
+from seed_ecb_core import decode_value, encode_value, parse_key, transform_stream
 
 FORMAT_LABELS = {"utf8": "문자열 (UTF-8)", "hex": "Hex", "base64": "Base64"}
 PADDING_LABELS = {"pkcs7": "PKCS#7 (기본)", "none": "없음 (16바이트 배수)", "zero": "0x00 채우기"}

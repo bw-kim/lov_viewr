@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-python seed_ecb_tool.py
+python SEED_ECB_portable.py
 if errorlevel 1 pause
